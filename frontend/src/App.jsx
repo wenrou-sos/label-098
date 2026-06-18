@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react'
+import React, { useState, useEffect, useCallback, useRef } from 'react'
 import { Layout, Tabs, Row, Col, Statistic, Spin, message, Button, Tooltip } from 'antd'
 import { apiService } from './services/api'
 import CityDemographics from './components/CityDemographics'
@@ -11,33 +11,50 @@ function App() {
   const [loading, setLoading] = useState(true)
   const [data, setData] = useState(null)
   const [activeTab, setActiveTab] = useState('city')
+  const fetchingRef = useRef(false)
+  const mountedRef = useRef(false)
 
-  const fetchData = useCallback(async () => {
+  const fetchData = useCallback(async ({ showTip = false } = {}) => {
+    if (fetchingRef.current) return
+    fetchingRef.current = true
     setLoading(true)
     try {
       const result = await apiService.getAllData()
       setData(result)
-      message.success('数据加载成功')
+      if (showTip) {
+        message.success('数据加载成功')
+      }
     } catch (err) {
       message.error('数据加载失败，请检查后端服务')
       console.error(err)
     } finally {
       setLoading(false)
+      fetchingRef.current = false
     }
   }, [])
 
   const handleRegenerate = async () => {
+    if (fetchingRef.current) return
+    fetchingRef.current = true
+    setLoading(true)
     try {
-      setLoading(true)
       await apiService.regenerateData()
-      await fetchData()
+      const result = await apiService.getAllData()
+      setData(result)
+      message.success('数据刷新成功')
     } catch (err) {
       message.error('重新生成数据失败')
+    } finally {
+      setLoading(false)
+      fetchingRef.current = false
     }
   }
 
   useEffect(() => {
-    fetchData()
+    if (!mountedRef.current) {
+      mountedRef.current = true
+      fetchData({ showTip: false })
+    }
   }, [fetchData])
 
   const tabItems = [

@@ -31,13 +31,20 @@ def health():
 def regenerate_data():
     global data_cache, data_loaded
     try:
-        from data_generator import main as gen_main
-        gen_main()
-        from analyzer import run_all_analysis
-        data_cache = run_all_analysis()
+        data_loaded = False
+        import importlib
+        import data_generator
+        importlib.reload(data_generator)
+        data_generator.main()
+        import analyzer
+        importlib.reload(analyzer)
+        data_cache = analyzer.run_all_analysis()
         data_loaded = True
         return jsonify({'status': 'success', 'message': '数据重新生成并分析完成'})
     except Exception as e:
+        data_loaded = False
+        import traceback
+        traceback.print_exc()
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
 @app.route('/api/summary')
@@ -84,4 +91,4 @@ if __name__ == '__main__':
     ensure_data()
     print("✅ 数据加载完成")
     print("🌐 服务地址: http://localhost:5000")
-    app.run(debug=True, host='0.0.0.0', port=5000)
+    app.run(debug=False, host='0.0.0.0', port=5000)

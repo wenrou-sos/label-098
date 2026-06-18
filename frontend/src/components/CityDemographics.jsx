@@ -23,6 +23,16 @@ function CityDemographics({ data }) {
     return cities
   }, [cities, selectedTier])
 
+  const handleTierChange = (val) => {
+    setSelectedTier(val)
+    if (val && selectedCity) {
+      const cityInfo = cities.find(c => c.name === selectedCity)
+      if (cityInfo && cityInfo.tier !== val) {
+        setSelectedCity(null)
+      }
+    }
+  }
+
   const ratioOption = useMemo(() => ({
     tooltip: {
       trigger: 'axis',
@@ -71,23 +81,26 @@ function CityDemographics({ data }) {
 
   const ageDistOption = useMemo(() => {
     const target = selectedCity ? cities.find(c => c.name === selectedCity) : null
+    const sourceCities = filteredCities
     if (!target) {
       const avgMale = { '20-25': 0, '26-30': 0, '31-35': 0, '36-40': 0, '40+': 0 }
       const avgFemale = { '20-25': 0, '26-30': 0, '31-35': 0, '36-40': 0, '40+': 0 }
-      cities.forEach(c => {
+      sourceCities.forEach(c => {
         Object.keys(avgMale).forEach(k => {
           avgMale[k] += c.male_age_dist[k] || 0
           avgFemale[k] += c.female_age_dist[k] || 0
         })
       })
+      const count = sourceCities.length || 1
       Object.keys(avgMale).forEach(k => {
-        avgMale[k] = Math.round(avgMale[k] / cities.length)
-        avgFemale[k] = Math.round(avgFemale[k] / cities.length)
+        avgMale[k] = Math.round(avgMale[k] / count)
+        avgFemale[k] = Math.round(avgFemale[k] / count)
       })
-      return buildAgeDistChart(avgMale, avgFemale, '全部城市平均')
+      const title = selectedTier ? `${selectedTier}城市平均` : '全部城市平均'
+      return buildAgeDistChart(avgMale, avgFemale, title)
     }
     return buildAgeDistChart(target.male_age_dist, target.female_age_dist, target.name)
-  }, [selectedCity, cities])
+  }, [selectedCity, cities, filteredCities, selectedTier])
 
   function buildAgeDistChart(maleDist, femaleDist, title) {
     const ageGroups = ['20-25', '26-30', '31-35', '36-40', '40+']
@@ -142,7 +155,7 @@ function CityDemographics({ data }) {
     }
   }
 
-  const tableData = cities.map(c => ({
+  const tableData = filteredCities.map(c => ({
     key: c.name,
     city: c.name,
     tier: c.tier,
@@ -195,7 +208,7 @@ function CityDemographics({ data }) {
               style={{ width: 160 }}
               placeholder="筛选城市线级"
               allowClear
-              onChange={setSelectedTier}
+              onChange={handleTierChange}
               options={[
                 { value: '一线', label: '一线城市' },
                 { value: '新一线', label: '新一线城市' },
@@ -218,8 +231,9 @@ function CityDemographics({ data }) {
               placeholder="选择城市查看详情"
               allowClear
               showSearch
+              value={selectedCity}
               onChange={setSelectedCity}
-              options={cities.map(c => ({ value: c.name, label: c.name }))}
+              options={filteredCities.map(c => ({ value: c.name, label: c.name }))}
             />
           </Card>
           <div className="chart-card">
@@ -231,7 +245,12 @@ function CityDemographics({ data }) {
       </Row>
 
       <div className="chart-card">
-        <div className="chart-title">全量城市人口结构明细</div>
+        <div className="chart-title">
+          {selectedTier ? `${selectedTier}城市人口结构明细` : '全量城市人口结构明细'}
+          <span style={{ fontSize: 12, color: '#999', fontWeight: 'normal' }}>
+            共 {filteredCities.length} 个城市
+          </span>
+        </div>
         <Table
           dataSource={tableData}
           columns={columns}
