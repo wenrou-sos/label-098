@@ -1,0 +1,182 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html, body, #root {
+  height: 100%;
+  width: 100%;
+}
+
+body {
+  background: linear-gradient(135deg, #fdf2f8 0%, #eff6ff 100%);
+  min-height: 100vh;
+}
+
+.dashboard-container {
+  min-height: 100vh;
+  padding: 24px;
+}
+
+.dashboard-header {
+  text-align: center;
+  margin-bottom: 32px;
+  padding: 24px 0;
+}
+
+.dashboard-title {
+  font-size: 32px;
+  font-weight: 700;
+  background: linear-gradient(135deg, #eb2f96 0%, #1890ff 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  margin-bottom: 8px;
+}
+
+.dashboard-subtitle {
+  font-size: 14px;
+  color: #666;
+}
+
+.stat-card {
+  background: white;
+  border-radius: 12px;
+  padding: 20px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+  transition: transform 0.2s, box-shadow 0.2s;
+  border-left: 4px solid #eb2f96;
+}
+
+.stat-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+}
+
+.stat-card .stat-label {
+  font-size: 13px;
+  color: #888;
+  margin-bottom: 8px;
+}
+
+.stat-card .stat-value {
+  font-size: 28px;
+  font-weight: 700;
+  color: #333;
+}
+
+.stat-card .stat-icon {
+  font-size: 36px;
+  opacity: 0.3;
+  position: absolute;
+  right: 20px;
+  top: 20px;
+}
+
+.chart-card {
+  background: white;
+  border-radius: 12px;
+  padding: 20px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+  height: 100%;
+}
+
+.chart-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: #333;
+  margin-bottom: 16px;
+  padding-left: 12px;
+  border-left: 3px solid #eb2f96;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.chart-container {
+  width: 100%;
+  height: 380px;
+}
+
+.tag-healthy {
+  background: #f6ffed;
+  color: #52c41a;
+  border: 1px solid #b7eb8f;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+}
+
+.tag-warning {
+  background: #fff7e6;
+  color: #fa8c16;
+  border: 1px solid #ffd591;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+}
+
+.tag-danger {
+  background: #fff1f0;
+  color: #f5222d;
+  border: 1px solid #ffa39e;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+}
+
+.anxiety-meter {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 20px;
+}
+
+.keyword-cloud-male {
+  background: linear-gradient(135deg, #e6f7ff 0%, #bae7ff 100%);
+  padding: 16px;
+  border-radius: 8px;
+}
+
+.keyword-cloud-female {
+  background: linear-gradient(135deg, #fff0f6 0%, #ffd6e7 100%);
+  padding: 16px;
+  border-radius: 8px;
+}
+
+.keyword-item {
+  display: inline-block;
+  margin: 4px 8px;
+  padding: 4px 12px;
+  border-radius: 16px;
+  font-size: 14px;
+  cursor: pointer;
+  transition: transform 0.15s;
+}
+
+.keyword-item:hover {
+  transform: scale(1.1);
+}
+
+.focus-bar {
+  margin-bottom: 8px;
+}
+
+@media (max-width: 768px) {
+  .dashboard-container {
+    padding: 12px;
+  }
+  
+  .dashboard-title {
+    font-size: 22px;
+  }
+  
+  .chart-container {
+    height: 300px;
+  }
+  
+  .stat-card .stat-value {
+    font-size: 22px;
+  }
+}
