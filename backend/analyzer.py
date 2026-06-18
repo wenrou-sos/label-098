@@ -130,6 +130,16 @@ def analyze_self_intros(users_df, top_n=20):
     for gender in ['男', '女']:
         g_data = users_df[users_df['gender'] == gender]
         texts = g_data['self_intro'].dropna().tolist()
+        sample_count = len(texts)
+        
+        if sample_count == 0:
+            result[gender] = {
+                'top_keywords': [],
+                'focus_rates': {kw: 0 for kw in KEYWORDS_FOCUS},
+                'sample_count': 0
+            }
+            continue
+        
         all_text = ' '.join(texts)
         
         words = jieba.lcut(all_text)
@@ -141,12 +151,12 @@ def analyze_self_intros(users_df, top_n=20):
         focus_counts = {}
         for kw in KEYWORDS_FOCUS:
             count = all_text.count(kw)
-            focus_counts[kw] = round(count / len(texts) * 100, 1)
+            focus_counts[kw] = round(count / sample_count * 100, 1)
         
         result[gender] = {
             'top_keywords': [{'word': w, 'count': c} for w, c in top_words],
             'focus_rates': focus_counts,
-            'sample_count': len(texts)
+            'sample_count': sample_count
         }
     
     return result
@@ -333,13 +343,52 @@ def get_summary(users_df, payments_df, matches_df):
         'avg_age': round(users_df['age'].mean(), 1)
     }
 
-def run_all_analysis():
+def filter_users(users_df, tier=None, age_group=None, gender=None):
+    filtered = users_df.copy()
+    if tier:
+        filtered = filtered[filtered['city_tier'] == tier]
+    if age_group:
+        filtered['_age_group'] = filtered['age'].apply(get_age_group)
+        filtered = filtered[filtered['_age_group'] == age_group]
+        filtered = filtered.drop(columns=['_age_group'])
+    if gender:
+        filtered = filtered[filtered['gender'] == gender]
+    return filtered
+
+def filter_matches(matches_df, users_df, tier=None, age_group=None, gender=None):
+    if not tier and not age_group and not gender:
+        return matches_df
+    
+    filtered_users = filter_users(users_df, tier=tier, age_group=age_group, gender=gender)
+    filtered_ids = set(filtered_users['user_id'].tolist())
+    
+    result = matches_df[
+        matches_df['male_id'].isin(filtered_ids) & 
+        matches_df['female_id'].isin(filtered_ids)
+    ]
+    
+    return result
+
+def run_all_analysis(tier=None, age_group=None, gender=None):
     users, preferences, payments, matches = load_data()
+    
+    filtered_users = filter_users(users, tier=tier, age_group=age_group, gender=gender)
+    user_ids = set(filtered_users['user_id'].tolist())
+    
+    filtered_prefs = preferences[preferences['user_id'].isin(user_ids)]
+    filtered_payments = payments[payments['user_id'].isin(user_ids)]
+    filtered_matches = filter_matches(matches, users, tier=tier, age_group=age_group, gender=gender)
+    
     return {
-        'summary': get_summary(users, payments, matches),
-        'city_demographics': analyze_city_demographics(users),
-        'preference_differences': analyze_preference_differences(users, preferences),
-        'self_intro_analysis': analyze_self_intros(users),
-        'anxiety_index': analyze_anxiety_index(users, payments),
-        'match_success': analyze_match_success(matches)
+        'summary': get_summary(filtered_users, filtered_payments, filtered_matches),
+        'city_demographics': analyze_city_demographics(filtered_users),
+        'preference_differences': analyze_preference_differences(filtered_users, filtered_prefs),
+        'self_intro_analysis': analyze_self_intros(filtered_users),
+        'anxiety_index': analyze_anxiety_index(filtered_users, filtered_payments),
+        'match_success': analyze_match_success(filtered_matches),
+        'filter_applied': {
+            'tier': tier,
+            'age_group': age_group,
+            'gender': gender
+        }
     }

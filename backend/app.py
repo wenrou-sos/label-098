@@ -82,8 +82,23 @@ def get_match_success():
 
 @app.route('/api/all-data')
 def get_all_data():
-    data = ensure_data()
-    return jsonify(data)
+    tier = request.args.get('tier')
+    age_group = request.args.get('age_group')
+    gender = request.args.get('gender')
+    
+    has_filter = tier or age_group or gender
+    
+    if has_filter:
+        from analyzer import run_all_analysis
+        data = run_all_analysis(
+            tier=tier if tier else None,
+            age_group=age_group if age_group else None,
+            gender=gender if gender else None
+        )
+        return jsonify(data)
+    else:
+        data = ensure_data()
+        return jsonify(data)
 
 if __name__ == '__main__':
     print("🚀 启动婚恋市场数据分析看板后端服务...")

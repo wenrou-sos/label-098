@@ -14,7 +14,13 @@ export const apiService = {
   getSelfIntroAnalysis: () => api.get('/self-intro-analysis').then(r => r.data),
   getAnxietyIndex: () => api.get('/anxiety-index').then(r => r.data),
   getMatchSuccess: () => api.get('/match-success').then(r => r.data),
-  getAllData: () => api.get('/all-data').then(r => r.data)
+  getAllData: (filters = {}) => {
+    const params = {}
+    if (filters.tier) params.tier = filters.tier
+    if (filters.ageGroup) params.age_group = filters.ageGroup
+    if (filters.gender) params.gender = filters.gender
+    return api.get('/all-data', { params }).then(r => r.data)
+  }
 }
 
 export default apiService
