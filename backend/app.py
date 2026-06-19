@@ -6,6 +6,7 @@ import sys
 sys.path.insert(0, os.path.dirname(__file__))
 
 import history
+import clustering
 
 app = Flask(__name__)
 CORS(app)
@@ -165,6 +166,13 @@ def get_snapshot_history():
 def get_latest_version():
     version = history.get_latest_version()
     return jsonify({'version': version})
+
+@app.route('/api/user-clusters')
+def get_user_clusters():
+    n_clusters = int(request.args.get('n_clusters', 5))
+    sample_size = request.args.get('sample_size', type=int)
+    result = clustering.analyze_clusters(n_clusters=n_clusters, sample_size=sample_size)
+    return jsonify(result)
 
 if __name__ == '__main__':
     print("🚀 启动婚恋市场数据分析看板后端服务...")

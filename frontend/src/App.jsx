@@ -8,6 +8,7 @@ import AnxietyIndex from './components/AnxietyIndex'
 import MatchSuccess from './components/MatchSuccess'
 import CityMatch from './components/CityMatch'
 import TrendAnalysis from './components/TrendAnalysis'
+import UserClustering from './components/UserClustering'
 
 const { Option } = Select
 
@@ -178,7 +179,8 @@ function App() {
     { key: 'anxiety', label: '😰 婚恋焦虑指数' },
     { key: 'match', label: '💕 脱单成功规律' },
     { key: 'matchSim', label: '🎯 同城匹配模拟器' },
-    { key: 'trend', label: '📈 趋势变化分析' }
+    { key: 'trend', label: '📈 趋势变化分析' },
+    { key: 'cluster', label: '👥 用户画像聚类' }
   ]
 
   const IconEmoji = ({ emoji, className, style }) => (
@@ -373,6 +375,9 @@ function App() {
               )}
               {activeTab === 'trend' && (
                 <TrendAnalysis key={trendRefreshKey} />
+              )}
+              {activeTab === 'cluster' && (
+                <UserClustering />
               )}
             </Spin>
           </>
