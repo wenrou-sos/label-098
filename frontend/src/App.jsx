@@ -377,7 +377,7 @@ function App() {
                 <TrendAnalysis key={trendRefreshKey} />
               )}
               {activeTab === 'cluster' && (
-                <UserClustering />
+                <UserClustering key={trendRefreshKey} />
               )}
             </Spin>
           </>

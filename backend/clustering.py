@@ -80,51 +80,93 @@ def build_feature_matrix(users_df, pref_df, pay_df):
     return features, merged
 
 
-def assign_cluster_names(cluster_centers, feature_names):
+def assign_cluster_names(cluster_centers, feature_names, n_clusters):
     center_df = pd.DataFrame(cluster_centers, columns=feature_names)
     
-    sorted_by_income = center_df.sort_values('income', ascending=False)
-    high_income_idx = sorted_by_income.index[:2].tolist()
-    
-    high_edu_of_high = center_df.loc[high_income_idx].sort_values('education', ascending=False).index[0]
-    other_high = [i for i in high_income_idx if i != high_edu_of_high][0]
-    
-    remaining = [i for i in range(len(center_df)) if i not in high_income_idx]
-    sorted_remaining = center_df.loc[remaining].sort_values(['total_spent', 'pickiness'], ascending=[False, False])
-    
     name_map = {}
-    name_map[int(high_edu_of_high)] = '优质精英'
-    name_map[int(other_high)] = '务实刚需'
+    used_names = set()
     
-    remaining_indices = sorted_remaining.index.tolist()
+    feature_means = center_df.mean()
+    feature_stds = center_df.std()
     
-    if len(remaining_indices) >= 1:
-        anxiety_idx = remaining_indices[0]
-        if center_df.loc[anxiety_idx, 'age'] > center_df['age'].mean() and center_df.loc[anxiety_idx, 'total_spent'] > center_df['total_spent'].median():
-            name_map[int(anxiety_idx)] = '焦虑追赶'
+    z_scores = (center_df - feature_means) / feature_stds.replace(0, 1)
+    
+    def get_cluster_score(idx, rules):
+        score = 0
+        for feature, condition in rules.items():
+            if feature in z_scores.columns:
+                val = z_scores.loc[idx, feature]
+                if condition == 'high' and val > 0.3:
+                    score += 1
+                elif condition == 'very_high' and val > 0.7:
+                    score += 1.5
+                elif condition == 'low' and val < -0.3:
+                    score += 1
+                elif condition == 'very_low' and val < -0.7:
+                    score += 1.5
+                elif condition == 'medium' and abs(val) < 0.5:
+                    score += 0.5
+        return score
+    
+    name_candidates = ['优质精英', '务实刚需', '躺平佛系', '焦虑追赶', '潜力新秀']
+    
+    for idx in range(n_clusters):
+        scores = {}
+        
+        scores['优质精英'] = get_cluster_score(idx, {
+            'income': 'very_high',
+            'education': 'high',
+            'property': 'high',
+            'total_spent': 'high',
+            'pickiness': 'high'
+        })
+        
+        scores['务实刚需'] = get_cluster_score(idx, {
+            'income': 'medium',
+            'education': 'medium',
+            'property': 'medium',
+            'total_spent': 'high',
+            'pickiness': 'medium'
+        })
+        
+        scores['躺平佛系'] = get_cluster_score(idx, {
+            'income': 'low',
+            'education': 'low',
+            'property': 'low',
+            'total_spent': 'very_low',
+            'pickiness': 'very_low'
+        })
+        
+        scores['焦虑追赶'] = get_cluster_score(idx, {
+            'age': 'very_high',
+            'income': 'low',
+            'education': 'medium',
+            'property': 'low',
+            'total_spent': 'very_high',
+            'pickiness': 'high'
+        })
+        
+        scores['潜力新秀'] = get_cluster_score(idx, {
+            'age': 'very_low',
+            'income': 'low',
+            'education': 'high',
+            'property': 'medium',
+            'total_spent': 'low',
+            'pickiness': 'medium'
+        })
+        
+        available_scores = {k: v for k, v in scores.items() if k not in used_names}
+        if available_scores:
+            best_name = max(available_scores, key=available_scores.get)
+            name_map[idx] = best_name
+            used_names.add(best_name)
         else:
-            name_map[int(anxiety_idx)] = '潜力新秀'
-    
-    if len(remaining_indices) >= 2:
-        idx2 = remaining_indices[1]
-        if name_map.get(int(remaining_indices[0])) == '焦虑追赶':
-            if center_df.loc[idx2, 'age'] < center_df['age'].mean():
-                name_map[int(idx2)] = '潜力新秀'
+            remaining = [n for n in name_candidates if n not in used_names]
+            if remaining:
+                name_map[idx] = remaining[0]
+                used_names.add(remaining[0])
             else:
-                name_map[int(idx2)] = '躺平佛系'
-        else:
-            if center_df.loc[idx2, 'total_spent'] < center_df['total_spent'].median():
-                name_map[int(idx2)] = '躺平佛系'
-            else:
-                name_map[int(idx2)] = '焦虑追赶'
-    
-    if len(remaining_indices) >= 3:
-        idx3 = remaining_indices[2]
-        used_names = set(name_map.values())
-        for name in ['躺平佛系', '焦虑追赶', '潜力新秀']:
-            if name not in used_names:
-                name_map[int(idx3)] = name
-                break
+                name_map[idx] = f'群体{idx+1}'
     
     return name_map
 
@@ -132,9 +174,17 @@ def assign_cluster_names(cluster_centers, feature_names):
 def analyze_clusters(n_clusters=5, sample_size=None):
     users, preferences, payments = load_data()
     
+    total_user_count = len(users)
+    
     all_users = users.copy()
+    is_sampled = False
+    
     if sample_size and len(all_users) > sample_size:
         all_users = all_users.sample(n=sample_size, random_state=42)
+        is_sampled = True
+        sampled_count = len(all_users)
+    else:
+        sampled_count = len(all_users)
     
     user_ids = set(all_users['user_id'].tolist())
     sampled_prefs = preferences[preferences['user_id'].isin(user_ids)]
@@ -149,7 +199,7 @@ def analyze_clusters(n_clusters=5, sample_size=None):
     cluster_labels = kmeans.fit_predict(scaled_features)
     
     feature_names = features.columns.tolist()
-    name_map = assign_cluster_names(kmeans.cluster_centers_, feature_names)
+    name_map = assign_cluster_names(kmeans.cluster_centers_, feature_names, n_clusters)
     
     merged['cluster'] = [name_map[label] for label in cluster_labels]
     
@@ -236,7 +286,10 @@ def analyze_clusters(n_clusters=5, sample_size=None):
     }
     
     result = {
-        'total_users': int(len(merged)),
+        'total_users': int(total_user_count),
+        'analyzed_users': int(len(merged)),
+        'is_sampled': is_sampled,
+        'sampled_count': int(sampled_count) if is_sampled else None,
         'n_clusters': n_clusters,
         'clusters': clusters,
         'scatter_data': scatter_data,

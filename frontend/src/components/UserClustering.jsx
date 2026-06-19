@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react'
+import React, { useState, useEffect, useMemo, useRef } from 'react'
 import { apiService } from '../services/api'
 import {
   Row, Col, Card, Select, Spin, Typography, Space, Tag, Alert, Statistic, Progress
@@ -25,23 +25,31 @@ function UserClustering() {
   const [clusterData, setClusterData] = useState(null)
   const [nClusters, setNClusters] = useState(5)
   const [selectedCluster, setSelectedCluster] = useState(null)
+  const requestIdRef = useRef(0)
 
   useEffect(() => {
     loadClusters()
   }, [nClusters])
 
   const loadClusters = async () => {
+    const currentRequestId = ++requestIdRef.current
     setLoading(true)
     try {
-      const data = await apiService.getUserClusters({ n_clusters: nClusters, sample_size: 10000 })
-      setClusterData(data)
-      if (data.clusters && data.clusters.length > 0) {
-        setSelectedCluster(data.clusters[0].name)
+      const data = await apiService.getUserClusters({ n_clusters: nClusters })
+      if (currentRequestId === requestIdRef.current) {
+        setClusterData(data)
+        if (data.clusters && data.clusters.length > 0) {
+          setSelectedCluster(data.clusters[0].name)
+        }
       }
     } catch (err) {
-      console.error('加载聚类数据失败:', err)
+      if (currentRequestId === requestIdRef.current) {
+        console.error('加载聚类数据失败:', err)
+      }
     } finally {
-      setLoading(false)
+      if (currentRequestId === requestIdRef.current) {
+        setLoading(false)
+      }
     }
   }
 
@@ -277,7 +285,17 @@ function UserClustering() {
       <Spin spinning={loading}>
         {clusterData && (
           <>
-            <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
+            {clusterData.is_sampled && (
+              <Alert
+                message="⚠️ 数据说明"
+                description={`由于数据量较大，已抽样 ${clusterData.sampled_count.toLocaleString()} 条进行聚类分析，结果仅供参考。总用户 ${clusterData.total_users.toLocaleString()} 名，分析用户 ${clusterData.analyzed_users.toLocaleString()} 名。`}
+                type="warning"
+                showIcon
+                style={{ marginBottom: 16 }}
+              />
+            )}
+
+            <Row gutter={[16, 16]} style={{ marginBottom: 16 }}>
               {clusterData.clusters.map((cluster, idx) => (
                 <Col xs={12} md={8} lg={24 / clusterData.clusters.length} key={cluster.name}>
                   <Card
