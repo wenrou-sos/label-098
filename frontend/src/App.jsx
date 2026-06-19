@@ -7,6 +7,7 @@ import SelfIntroAnalysis from './components/SelfIntroAnalysis'
 import AnxietyIndex from './components/AnxietyIndex'
 import MatchSuccess from './components/MatchSuccess'
 import CityMatch from './components/CityMatch'
+import TrendAnalysis from './components/TrendAnalysis'
 
 const { Option } = Select
 
@@ -100,11 +101,12 @@ function App() {
     fetchingRef.current = true
     setLoading(true)
     try {
-      await apiService.regenerateData()
+      const regenResult = await apiService.regenerateData()
       const result = await apiService.getAllData(filters)
       if (myRequestId === requestIdRef.current) {
         setData(result)
-        message.success('数据刷新成功')
+        const versionMsg = regenResult?.version ? `（已保存为版本 v${regenResult.version}）` : ''
+        message.success(`数据刷新成功${versionMsg}`)
       }
     } catch (err) {
       if (myRequestId === requestIdRef.current) {
@@ -173,7 +175,8 @@ function App() {
     { key: 'intro', label: '📝 自我介绍内容分析' },
     { key: 'anxiety', label: '😰 婚恋焦虑指数' },
     { key: 'match', label: '💕 脱单成功规律' },
-    { key: 'matchSim', label: '🎯 同城匹配模拟器' }
+    { key: 'matchSim', label: '🎯 同城匹配模拟器' },
+    { key: 'trend', label: '📈 趋势变化分析' }
   ]
 
   const IconEmoji = ({ emoji, className, style }) => (
@@ -365,6 +368,9 @@ function App() {
               )}
               {activeTab === 'matchSim' && (
                 <CityMatch />
+              )}
+              {activeTab === 'trend' && (
+                <TrendAnalysis />
               )}
             </Spin>
           </>

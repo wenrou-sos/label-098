@@ -5,6 +5,8 @@ import sys
 
 sys.path.insert(0, os.path.dirname(__file__))
 
+import history
+
 app = Flask(__name__)
 CORS(app)
 
@@ -21,6 +23,13 @@ def ensure_data():
         from analyzer import run_all_analysis
         data_cache = run_all_analysis()
         data_loaded = True
+        
+        if history.get_latest_version() == 0:
+            history.save_snapshot(
+                data_cache['summary'],
+                data_cache['anxiety_index'],
+                data_cache['match_success']
+            )
     return data_cache
 
 @app.route('/api/health')
@@ -40,7 +49,18 @@ def regenerate_data():
         importlib.reload(analyzer)
         data_cache = analyzer.run_all_analysis()
         data_loaded = True
-        return jsonify({'status': 'success', 'message': '数据重新生成并分析完成'})
+        
+        version = history.save_snapshot(
+            data_cache['summary'],
+            data_cache['anxiety_index'],
+            data_cache['match_success']
+        )
+        
+        return jsonify({
+            'status': 'success', 
+            'message': f'数据重新生成并分析完成，已保存为版本 v{version}',
+            'version': version
+        })
     except Exception as e:
         data_loaded = False
         import traceback
@@ -129,6 +149,20 @@ def get_match_recs():
         top_n=top_n
     )
     return jsonify(sanitize_for_json(result))
+
+@app.route('/api/snapshot-history')
+def get_snapshot_history():
+    limit = int(request.args.get('limit', 50))
+    history_data = history.get_history(limit)
+    return jsonify({
+        'count': len(history_data),
+        'history': history_data
+    })
+
+@app.route('/api/latest-version')
+def get_latest_version():
+    version = history.get_latest_version()
+    return jsonify({'version': version})
 
 if __name__ == '__main__':
     print("🚀 启动婚恋市场数据分析看板后端服务...")

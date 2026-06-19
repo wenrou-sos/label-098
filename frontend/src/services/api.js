@@ -22,7 +22,9 @@ export const apiService = {
     return api.get('/all-data', { params }).then(r => r.data)
   },
   getCities: () => api.get('/cities').then(r => r.data),
-  getMatchRecommendations: (params) => api.get('/match-recommendations', { params }).then(r => r.data)
+  getMatchRecommendations: (params) => api.get('/match-recommendations', { params }).then(r => r.data),
+  getSnapshotHistory: (limit) => api.get('/snapshot-history', { params: { limit } }).then(r => r.data),
+  getLatestVersion: () => api.get('/latest-version').then(r => r.data)
 }
 
 export default apiService
