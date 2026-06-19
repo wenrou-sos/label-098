@@ -74,7 +74,16 @@ def save_snapshot(summary_data, anxiety_data, match_data):
     conn.close()
     return version
 
-def get_history(limit=50):
+def get_total_count():
+    init_db()
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute('SELECT COUNT(*) FROM data_snapshots')
+    count = cursor.fetchone()[0]
+    conn.close()
+    return count
+
+def get_history(limit=500):
     init_db()
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row

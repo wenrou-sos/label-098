@@ -152,10 +152,12 @@ def get_match_recs():
 
 @app.route('/api/snapshot-history')
 def get_snapshot_history():
-    limit = int(request.args.get('limit', 50))
+    limit = int(request.args.get('limit', 500))
     history_data = history.get_history(limit)
+    total_count = history.get_total_count()
     return jsonify({
-        'count': len(history_data),
+        'total_count': total_count,
+        'returned_count': len(history_data),
         'history': history_data
     })
 

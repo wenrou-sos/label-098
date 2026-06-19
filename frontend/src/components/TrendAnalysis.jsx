@@ -52,6 +52,8 @@ const CHART_GROUPS = [
 function TrendAnalysis() {
   const [loading, setLoading] = useState(true)
   const [historyData, setHistoryData] = useState([])
+  const [totalCount, setTotalCount] = useState(0)
+  const [returnedCount, setReturnedCount] = useState(0)
   const [selectedMetrics, setSelectedMetrics] = useState(['total_users', 'paid_rate', 'success_rate', 'anxiety_index_avg'])
 
   useEffect(() => {
@@ -61,8 +63,10 @@ function TrendAnalysis() {
   const loadHistory = async () => {
     setLoading(true)
     try {
-      const data = await apiService.getSnapshotHistory(100)
+      const data = await apiService.getSnapshotHistory(500)
       setHistoryData(data.history || [])
+      setTotalCount(data.total_count ?? (data.history || []).length)
+      setReturnedCount(data.returned_count ?? (data.history || []).length)
     } catch (err) {
       console.error('加载历史数据失败:', err)
     } finally {
@@ -217,7 +221,7 @@ function TrendAnalysis() {
             <Space>
               <Text type="secondary" style={{ fontSize: 12 }}>
                 <InfoCircleOutlined style={{ marginRight: 4 }} />
-                共 {historyData.length} 个历史版本
+                共 {totalCount} 个历史版本{returnedCount < totalCount ? `（展示最近 ${returnedCount} 条）` : ''}
               </Text>
             </Space>
           </div>

@@ -40,6 +40,7 @@ function App() {
     ageGroup: null,
     gender: null
   })
+  const [trendRefreshKey, setTrendRefreshKey] = useState(0)
   const fetchingRef = useRef(false)
   const mountedRef = useRef(false)
   const requestIdRef = useRef(0)
@@ -105,6 +106,7 @@ function App() {
       const result = await apiService.getAllData(filters)
       if (myRequestId === requestIdRef.current) {
         setData(result)
+        setTrendRefreshKey(prev => prev + 1)
         const versionMsg = regenResult?.version ? `（已保存为版本 v${regenResult.version}）` : ''
         message.success(`数据刷新成功${versionMsg}`)
       }
@@ -370,7 +372,7 @@ function App() {
                 <CityMatch />
               )}
               {activeTab === 'trend' && (
-                <TrendAnalysis />
+                <TrendAnalysis key={trendRefreshKey} />
               )}
             </Spin>
           </>
