@@ -9,19 +9,28 @@ const TIER_COLORS = {
   '三线': '#52c41a'
 }
 
-function CityDemographics({ data }) {
-  const [selectedTier, setSelectedTier] = useState(null)
+function CityDemographics({ data, globalFilter = null }) {
+  const globalTier = globalFilter?.tier || null
+  const [selectedTier, setSelectedTier] = useState(globalTier)
   const [selectedCity, setSelectedCity] = useState(null)
+
+  React.useEffect(() => {
+    setSelectedTier(globalTier)
+    setSelectedCity(null)
+  }, [globalTier])
 
   const cities = Object.entries(data).map(([name, info]) => ({
     name,
     ...info
   }))
 
+  const effectiveTier = globalTier || selectedTier
+
   const filteredCities = useMemo(() => {
+    if (globalTier) return cities
     if (selectedTier) return cities.filter(c => c.tier === selectedTier)
     return cities
-  }, [cities, selectedTier])
+  }, [cities, selectedTier, globalTier])
 
   const handleTierChange = (val) => {
     setSelectedTier(val)
@@ -96,11 +105,11 @@ function CityDemographics({ data }) {
         avgMale[k] = Math.round(avgMale[k] / count)
         avgFemale[k] = Math.round(avgFemale[k] / count)
       })
-      const title = selectedTier ? `${selectedTier}城市平均` : '全部城市平均'
+      const title = effectiveTier ? `${effectiveTier}城市平均` : '全部城市平均'
       return buildAgeDistChart(avgMale, avgFemale, title)
     }
     return buildAgeDistChart(target.male_age_dist, target.female_age_dist, target.name)
-  }, [selectedCity, cities, filteredCities, selectedTier])
+  }, [selectedCity, cities, filteredCities, effectiveTier])
 
   function buildAgeDistChart(maleDist, femaleDist, title) {
     const ageGroups = ['20-25', '26-30', '31-35', '36-40', '40+']
@@ -206,8 +215,10 @@ function CityDemographics({ data }) {
           <Card size="small" style={{ marginBottom: 8 }}>
             <Select
               style={{ width: 160 }}
-              placeholder="筛选城市线级"
-              allowClear
+              placeholder={globalTier ? `全局已筛选：${globalTier}` : '筛选城市线级'}
+              allowClear={!globalTier}
+              disabled={!!globalTier}
+              value={selectedTier}
               onChange={handleTierChange}
               options={[
                 { value: '一线', label: '一线城市' },
@@ -216,6 +227,11 @@ function CityDemographics({ data }) {
                 { value: '三线', label: '三线城市' }
               ]}
             />
+            {globalTier && (
+              <span style={{ color: '#999', fontSize: 12, marginLeft: 8 }}>
+                （受全局筛选控制）
+              </span>
+            )}
           </Card>
           <div className="chart-card">
             <div className="chart-title">各城市男女比例分布</div>
@@ -246,7 +262,7 @@ function CityDemographics({ data }) {
 
       <div className="chart-card">
         <div className="chart-title">
-          {selectedTier ? `${selectedTier}城市人口结构明细` : '全量城市人口结构明细'}
+          {effectiveTier ? `${effectiveTier}城市人口结构明细` : '全量城市人口结构明细'}
           <span style={{ fontSize: 12, color: '#999', fontWeight: 'normal' }}>
             共 {filteredCities.length} 个城市
           </span>

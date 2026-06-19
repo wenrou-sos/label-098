@@ -2,6 +2,7 @@ import pandas as pd
 import numpy as np
 import jieba
 import re
+import math
 from collections import Counter
 import os
 
@@ -9,6 +10,20 @@ DATA_PATH = os.path.join(os.path.dirname(__file__), '..', 'data')
 
 EDUCATION_RANK = {'高中': 0, '大专': 1, '本科': 2, '硕士': 3, '博士': 4}
 INCOME_RANK = {'5k以下': 0, '5k-10k': 1, '10k-20k': 2, '20k-50k': 3, '50k以上': 4}
+
+def sanitize_for_json(obj):
+    if isinstance(obj, dict):
+        return {k: sanitize_for_json(v) for k, v in obj.items()}
+    elif isinstance(obj, list):
+        return [sanitize_for_json(item) for item in obj]
+    elif isinstance(obj, (float, np.floating)):
+        if math.isnan(obj) or math.isinf(obj):
+            return 0
+        return float(obj)
+    elif isinstance(obj, (np.integer,)):
+        return int(obj)
+    else:
+        return obj
 
 def load_data():
     users = pd.read_csv(os.path.join(DATA_PATH, 'users.csv'), encoding='utf-8-sig')
@@ -359,14 +374,45 @@ def filter_matches(matches_df, users_df, tier=None, age_group=None, gender=None)
     if not tier and not age_group and not gender:
         return matches_df
     
-    filtered_users = filter_users(users_df, tier=tier, age_group=age_group, gender=gender)
-    filtered_ids = set(filtered_users['user_id'].tolist())
+    user_info = users_df[['user_id', 'city_tier', 'gender', 'age']].copy()
+    user_info['age_group'] = user_info['age'].apply(get_age_group)
     
-    result = matches_df[
-        matches_df['male_id'].isin(filtered_ids) & 
-        matches_df['female_id'].isin(filtered_ids)
-    ]
+    male_info = user_info.rename(columns={
+        'user_id': 'male_id', 'city_tier': 'male_city_tier',
+        'gender': 'male_gender', 'age': 'male_age_col', 'age_group': 'male_age_group'
+    })
+    female_info = user_info.rename(columns={
+        'user_id': 'female_id', 'city_tier': 'female_city_tier',
+        'gender': 'female_gender', 'age': 'female_age_col', 'age_group': 'female_age_group'
+    })
     
+    merged = matches_df.merge(male_info, on='male_id', how='left')
+    merged = merged.merge(female_info, on='female_id', how='left')
+    
+    if gender:
+        if gender == '男':
+            merged = merged[merged['male_gender'] == '男']
+            if tier:
+                merged = merged[merged['male_city_tier'] == tier]
+            if age_group:
+                merged = merged[merged['male_age_group'] == age_group]
+        elif gender == '女':
+            merged = merged[merged['female_gender'] == '女']
+            if tier:
+                merged = merged[merged['female_city_tier'] == tier]
+            if age_group:
+                merged = merged[merged['female_age_group'] == age_group]
+    else:
+        if tier:
+            merged = merged[
+                (merged['male_city_tier'] == tier) & (merged['female_city_tier'] == tier)
+            ]
+        if age_group:
+            merged = merged[
+                (merged['male_age_group'] == age_group) & (merged['female_age_group'] == age_group)
+            ]
+    
+    result = merged[matches_df.columns]
     return result
 
 def run_all_analysis(tier=None, age_group=None, gender=None):
@@ -379,7 +425,7 @@ def run_all_analysis(tier=None, age_group=None, gender=None):
     filtered_payments = payments[payments['user_id'].isin(user_ids)]
     filtered_matches = filter_matches(matches, users, tier=tier, age_group=age_group, gender=gender)
     
-    return {
+    result = {
         'summary': get_summary(filtered_users, filtered_payments, filtered_matches),
         'city_demographics': analyze_city_demographics(filtered_users),
         'preference_differences': analyze_preference_differences(filtered_users, filtered_prefs),
@@ -392,3 +438,4 @@ def run_all_analysis(tier=None, age_group=None, gender=None):
             'gender': gender
         }
     }
+    return sanitize_for_json(result)

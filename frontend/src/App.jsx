@@ -40,54 +40,105 @@ function App() {
   })
   const fetchingRef = useRef(false)
   const mountedRef = useRef(false)
+  const requestIdRef = useRef(0)
+  const debounceRef = useRef(null)
 
-  const fetchData = useCallback(async ({ showTip = false, filterParams = null } = {}) => {
-    if (fetchingRef.current) return
+  const fetchData = useCallback(async ({ showTip = false, filterParams = { tier: null, ageGroup: null, gender: null } } = {}) => {
+    const myRequestId = ++requestIdRef.current
     fetchingRef.current = true
     setLoading(true)
     try {
-      const currentFilters = filterParams || filters
-      const result = await apiService.getAllData(currentFilters)
-      setData(result)
-      if (showTip) {
-        message.success('数据加载成功')
+      const currentFilters = {
+        tier: filterParams.tier,
+        ageGroup: filterParams.ageGroup,
+        gender: filterParams.gender
+      }
+      console.log(`[fetchData #${myRequestId}] start, filters:`, JSON.stringify(currentFilters))
+      let result = await apiService.getAllData(currentFilters)
+      console.log(`[fetchData #${myRequestId}] response received, typeof:`, typeof result)
+      if (typeof result === 'string') {
+        try {
+          result = JSON.parse(result)
+          console.log(`[fetchData #${myRequestId}] parsed string to JSON`)
+        } catch (parseErr) {
+          console.error(`[fetchData #${myRequestId}] Failed to parse string JSON:`, parseErr)
+        }
+      }
+      console.log(`[fetchData #${myRequestId}] result.summary exists:`, !!result?.summary, 'total_users:', result?.summary?.total_users)
+      if (myRequestId === requestIdRef.current) {
+        if (result && result.summary) {
+          setData(result)
+          console.log(`[fetchData #${myRequestId}] setData SUCCESS`)
+        } else {
+          console.error(`[fetchData #${myRequestId}] result invalid, summary missing:`, Object.keys(result || {}))
+          message.warning('数据格式异常，请重试')
+        }
+        if (showTip && result?.summary) {
+          message.success('数据加载成功')
+        }
+      } else {
+        console.log(`[fetchData #${myRequestId}] superseded by #${requestIdRef.current}, discarding`)
       }
     } catch (err) {
-      message.error('数据加载失败，请检查后端服务')
-      console.error(err)
+      if (myRequestId === requestIdRef.current) {
+        message.error('数据加载失败，请检查后端服务')
+        console.error('[fetchData] error:', err)
+      } else {
+        console.log(`[fetchData #${myRequestId}] error but was superseded, ignoring`)
+      }
     } finally {
-      setLoading(false)
-      fetchingRef.current = false
+      if (myRequestId === requestIdRef.current) {
+        setLoading(false)
+        fetchingRef.current = false
+      }
     }
-  }, [filters])
+  }, [])
 
   const handleRegenerate = async () => {
-    if (fetchingRef.current) return
+    const myRequestId = ++requestIdRef.current
     fetchingRef.current = true
     setLoading(true)
     try {
       await apiService.regenerateData()
       const result = await apiService.getAllData(filters)
-      setData(result)
-      message.success('数据刷新成功')
+      if (myRequestId === requestIdRef.current) {
+        setData(result)
+        message.success('数据刷新成功')
+      }
     } catch (err) {
-      message.error('重新生成数据失败')
+      if (myRequestId === requestIdRef.current) {
+        message.error('重新生成数据失败')
+      }
     } finally {
-      setLoading(false)
-      fetchingRef.current = false
+      if (myRequestId === requestIdRef.current) {
+        setLoading(false)
+        fetchingRef.current = false
+      }
     }
   }
 
   const handleFilterChange = (key, value) => {
     const newFilters = { ...filters, [key]: value || null }
     setFilters(newFilters)
-    fetchData({ filterParams: newFilters, showTip: false })
+    
+    if (debounceRef.current) {
+      clearTimeout(debounceRef.current)
+    }
+    debounceRef.current = setTimeout(() => {
+      fetchData({ filterParams: newFilters, showTip: false })
+    }, 200)
   }
 
   const resetFilters = () => {
     const newFilters = { tier: null, ageGroup: null, gender: null }
     setFilters(newFilters)
-    fetchData({ filterParams: newFilters, showTip: false })
+    
+    if (debounceRef.current) {
+      clearTimeout(debounceRef.current)
+    }
+    debounceRef.current = setTimeout(() => {
+      fetchData({ filterParams: newFilters, showTip: false })
+    }, 200)
   }
 
   const hasActiveFilters = filters.tier || filters.ageGroup || filters.gender
@@ -98,6 +149,22 @@ function App() {
       fetchData({ showTip: false })
     }
   }, [fetchData])
+
+  useEffect(() => {
+    window.__debugSetFilter = (key, val) => {
+      handleFilterChange(key, val)
+    }
+    window.__debugReset = () => resetFilters()
+    window.__debugFetch = () => {
+      console.log('manual fetch with filters:', filters)
+      fetchData({ filterParams: filters })
+    }
+    return () => {
+      delete window.__debugSetFilter
+      delete window.__debugReset
+      delete window.__debugFetch
+    }
+  }, [fetchData, filters])
 
   const tabItems = [
     { key: 'city', label: '🏙️ 城市人口结构分析' },
@@ -185,7 +252,7 @@ function App() {
               </Button>
             )}
 
-            {hasActiveFilters && data.filter_applied && (
+            {hasActiveFilters && data?.filter_applied && (
               <div style={{ color: '#888', fontSize: 12, display: 'flex', alignItems: 'center', gap: 6 }}>
                 <span>当前筛选：</span>
                 {data.filter_applied.tier && (
@@ -280,19 +347,19 @@ function App() {
 
             <Spin spinning={loading}>
               {activeTab === 'city' && data && (
-                <CityDemographics data={data.city_demographics} />
+                <CityDemographics data={data.city_demographics} globalFilter={data.filter_applied} />
               )}
               {activeTab === 'preference' && data && (
-                <PreferenceDifferences data={data.preference_differences} />
+                <PreferenceDifferences data={data.preference_differences} globalFilter={data.filter_applied} />
               )}
               {activeTab === 'intro' && data && (
-                <SelfIntroAnalysis data={data.self_intro_analysis} />
+                <SelfIntroAnalysis data={data.self_intro_analysis} globalFilter={data.filter_applied} />
               )}
               {activeTab === 'anxiety' && data && (
                 <AnxietyIndex data={data.anxiety_index} />
               )}
               {activeTab === 'match' && data && (
-                <MatchSuccess data={data.match_success} />
+                <MatchSuccess data={data.match_success} globalFilter={data.filter_applied} />
               )}
             </Spin>
           </>
