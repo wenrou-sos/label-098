@@ -1,8 +1,8 @@
-import React, { useState, useEffect, useMemo } from 'react'
+import React, { useState, useEffect, useMemo, useRef } from 'react'
 import { apiService } from '../services/api'
 import {
   Row, Col, Card, Select, InputNumber, Button, Spin, List, Avatar, Tag,
-  Progress, Space, Typography, Empty, Divider, Tooltip
+  Progress, Space, Typography, Empty, Divider, Tooltip, Alert
 } from 'antd'
 import {
   UserOutlined, HeartOutlined, HomeOutlined, BankOutlined,
@@ -49,6 +49,8 @@ function CityMatch() {
   const [maxAge, setMaxAge] = useState(32)
   const [minEducation, setMinEducation] = useState(null)
   const [citiesLoading, setCitiesLoading] = useState(true)
+  const requestIdRef = useRef(0)
+  const [ageError, setAgeError] = useState(false)
 
   useEffect(() => {
     loadCities()
@@ -71,6 +73,12 @@ function CityMatch() {
 
   const handleSearch = async () => {
     if (!selectedCity) return
+    if (minAge > maxAge) {
+      setAgeError(true)
+      return
+    }
+    setAgeError(false)
+    const myRequestId = ++requestIdRef.current
     setLoading(true)
     try {
       const params = {
@@ -84,11 +92,17 @@ function CityMatch() {
         params.education = minEducation
       }
       const data = await apiService.getMatchRecommendations(params)
-      setRecommendations(data)
+      if (myRequestId === requestIdRef.current) {
+        setRecommendations(data)
+      }
     } catch (err) {
-      console.error('获取匹配推荐失败:', err)
+      if (myRequestId === requestIdRef.current) {
+        console.error('获取匹配推荐失败:', err)
+      }
     } finally {
-      setLoading(false)
+      if (myRequestId === requestIdRef.current) {
+        setLoading(false)
+      }
     }
   }
 
@@ -160,10 +174,10 @@ function CityMatch() {
                 {item.self_intro_full}
               </Paragraph>
               <Space wrap size={8}>
-                {item.req_education && (
+                {item.req_education != null && (
                   <Tag color="purple">学历要求: {item.req_education}</Tag>
                 )}
-                {item.pref_min_age && (
+                {item.pref_min_age != null && item.pref_max_age != null && (
                   <Tag color="cyan">
                     年龄偏好: {item.pref_min_age}-{item.pref_max_age}岁
                   </Tag>
@@ -260,9 +274,18 @@ function CityMatch() {
                 min={18}
                 max={60}
                 value={minAge}
-                onChange={val => setMinAge(val || 18)}
+                onChange={val => {
+                  const newVal = val || 18
+                  setMinAge(newVal)
+                  if (newVal > maxAge) {
+                    setAgeError(true)
+                  } else {
+                    setAgeError(false)
+                  }
+                }}
                 style={{ width: '100%' }}
                 addonAfter="岁"
+                status={ageError ? 'error' : ''}
               />
             </Col>
             <Col xs={24} sm={8} md={4}>
@@ -273,9 +296,18 @@ function CityMatch() {
                 min={18}
                 max={60}
                 value={maxAge}
-                onChange={val => setMaxAge(val || 60)}
+                onChange={val => {
+                  const newVal = val || 60
+                  setMaxAge(newVal)
+                  if (minAge > newVal) {
+                    setAgeError(true)
+                  } else {
+                    setAgeError(false)
+                  }
+                }}
                 style={{ width: '100%' }}
                 addonAfter="岁"
+                status={ageError ? 'error' : ''}
               />
             </Col>
             <Col xs={24} sm={8} md={5}>
@@ -295,6 +327,15 @@ function CityMatch() {
               </Select>
             </Col>
           </Row>
+          {ageError && (
+            <Alert
+              message="年龄范围错误"
+              description="最小年龄不能大于最大年龄，请调整筛选条件"
+              type="error"
+              showIcon
+              style={{ marginTop: 8 }}
+            />
+          )}
           {recommendations && (
             <div style={{ marginTop: 8, padding: '12px 16px', background: '#f6f8fa', borderRadius: 6 }}>
               <Space size={24} wrap>
