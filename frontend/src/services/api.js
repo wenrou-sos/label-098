@@ -20,7 +20,9 @@ export const apiService = {
     if (filters.ageGroup) params.age_group = filters.ageGroup
     if (filters.gender) params.gender = filters.gender
     return api.get('/all-data', { params }).then(r => r.data)
-  }
+  },
+  getCities: () => api.get('/cities').then(r => r.data),
+  getMatchRecommendations: (params) => api.get('/match-recommendations', { params }).then(r => r.data)
 }
 
 export default apiService

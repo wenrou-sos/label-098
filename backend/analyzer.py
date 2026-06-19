@@ -439,3 +439,141 @@ def run_all_analysis(tier=None, age_group=None, gender=None):
         }
     }
     return sanitize_for_json(result)
+
+def get_city_list():
+    users, _, _, _ = load_data()
+    cities = sorted(users['city'].unique().tolist())
+    tier_map = users.groupby('city')['city_tier'].first().to_dict()
+    result = []
+    for city in cities:
+        result.append({
+            'name': city,
+            'tier': tier_map[city],
+            'male_count': int(len(users[(users['city'] == city) & (users['gender'] == '男')])),
+            'female_count': int(len(users[(users['city'] == city) & (users['gender'] == '女')]))
+        })
+    return result
+
+def calculate_match_score(user_a, user_b):
+    score = 0
+    details = {}
+    
+    age_diff = abs(user_a['age'] - user_b['age'])
+    if age_diff <= 3:
+        age_score = 30
+    elif age_diff <= 5:
+        age_score = 20
+    elif age_diff <= 7:
+        age_score = 10
+    else:
+        age_score = 0
+    score += age_score
+    details['age_diff'] = int(age_diff)
+    details['age_score'] = age_score
+    
+    edu_diff = abs(EDUCATION_RANK.get(user_a['education'], 0) - EDUCATION_RANK.get(user_b['education'], 0))
+    if edu_diff == 0:
+        edu_score = 25
+    elif abs(edu_diff) == 1:
+        edu_score = 15
+    elif abs(edu_diff) == 2:
+        edu_score = 5
+    else:
+        edu_score = 0
+    score += edu_score
+    details['education_diff'] = int(edu_diff)
+    details['education_score'] = edu_score
+    
+    income_diff = abs(INCOME_RANK.get(user_a['income'], 0) - INCOME_RANK.get(user_b['income'], 0))
+    if income_diff == 0:
+        income_score = 20
+    elif abs(income_diff) == 1:
+        income_score = 15
+    elif abs(income_diff) == 2:
+        income_score = 8
+    else:
+        income_score = 0
+    score += income_score
+    details['income_diff'] = int(income_diff)
+    details['income_score'] = income_score
+    
+    if user_a['city'] == user_b['city']:
+        city_score = 15
+    else:
+        city_score = 0
+    score += city_score
+    details['same_city'] = user_a['city'] == user_b['city']
+    details['city_score'] = city_score
+    
+    property_score = 0
+    if user_a.get('property', '') == user_b.get('property', ''):
+        property_score = 5
+    elif user_a.get('property', '').startswith('有房') and user_b.get('property', '').startswith('有房'):
+        property_score = 3
+    score += property_score
+    details['property_score'] = property_score
+    
+    details['total_score'] = score
+    return score, details
+
+def get_match_recommendations(city, target_gender, min_age, max_age, min_education=None, top_n=20):
+    users, preferences, _, _ = load_data()
+    
+    candidates = users[users['city'] == city].copy()
+    target_gender_opposite = '女' if target_gender == '男' else '男'
+    candidates = candidates[candidates['gender'] == target_gender_opposite]
+    candidates = candidates[(candidates['age'] >= min_age) & (candidates['age'] <= max_age)]
+    
+    if min_education:
+        min_rank = EDUCATION_RANK.get(min_education, 0)
+        candidates = candidates[candidates['education'].map(lambda x: EDUCATION_RANK.get(x, 0) >= min_rank)]
+    
+    target_prefs = preferences[preferences['user_id'].isin(candidates['user_id'])]
+    
+    all_candidates = candidates.to_dict('records')
+    
+    results = []
+    for cand in all_candidates:
+        score, details = calculate_match_score(
+            {'age': (min_age + max_age) // 2, 'education': min_education or '本科', 'income': '10k-20k', 'city': city},
+            cand
+        )
+        cand_pref = preferences[preferences['user_id'] == cand['user_id']].iloc[0] if len(preferences[preferences['user_id'] == cand['user_id']]) > 0 else None
+        
+        intro_text = cand.get('self_intro', '')
+        intro_summary = intro_text[:60] + '...' if len(intro_text) > 60 else intro_text
+        
+        results.append({
+            'user_id': cand['user_id'],
+            'age': int(cand['age']),
+            'gender': cand['gender'],
+            'education': cand['education'],
+            'income': cand['income'],
+            'property': cand['property'],
+            'height': int(cand['height']),
+            'self_intro': intro_summary,
+            'self_intro_full': intro_text,
+            'city': cand['city'],
+            'city_tier': cand['city_tier'],
+            'match_score': int(score),
+            'match_details': details,
+            'pref_min_age': int(cand_pref['pref_min_age']) if cand_pref is not None else None,
+            'pref_max_age': int(cand_pref['pref_max_age']) if cand_pref is not None else None,
+            'req_education': cand_pref['req_education'] if cand_pref is not None else None
+        })
+    
+    results.sort(key=lambda x: x['match_score'], reverse=True)
+    results = results[:top_n]
+    
+    return {
+        'city': city,
+        'target_gender': target_gender,
+        'criteria': {
+            'min_age': min_age,
+            'max_age': max_age,
+            'min_education': min_education
+        },
+        'total_candidates': len(results),
+        'total_available': len(candidates),
+        'recommendations': results
+    }

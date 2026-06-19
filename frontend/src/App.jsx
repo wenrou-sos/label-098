@@ -6,6 +6,7 @@ import PreferenceDifferences from './components/PreferenceDifferences'
 import SelfIntroAnalysis from './components/SelfIntroAnalysis'
 import AnxietyIndex from './components/AnxietyIndex'
 import MatchSuccess from './components/MatchSuccess'
+import CityMatch from './components/CityMatch'
 
 const { Option } = Select
 
@@ -171,7 +172,8 @@ function App() {
     { key: 'preference', label: '💝 择偶要求差异分析' },
     { key: 'intro', label: '📝 自我介绍内容分析' },
     { key: 'anxiety', label: '😰 婚恋焦虑指数' },
-    { key: 'match', label: '💕 脱单成功规律' }
+    { key: 'match', label: '💕 脱单成功规律' },
+    { key: 'matchSim', label: '🎯 同城匹配模拟器' }
   ]
 
   const IconEmoji = ({ emoji, className, style }) => (
@@ -360,6 +362,9 @@ function App() {
               )}
               {activeTab === 'match' && data && (
                 <MatchSuccess data={data.match_success} globalFilter={data.filter_applied} />
+              )}
+              {activeTab === 'matchSim' && (
+                <CityMatch />
               )}
             </Spin>
           </>

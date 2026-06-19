@@ -100,6 +100,36 @@ def get_all_data():
         data = ensure_data()
         return jsonify(data)
 
+@app.route('/api/cities')
+def get_cities():
+    from analyzer import get_city_list
+    cities = get_city_list()
+    return jsonify({'cities': cities})
+
+@app.route('/api/match-recommendations')
+def get_match_recs():
+    from analyzer import get_match_recommendations
+    city = request.args.get('city')
+    target_gender = request.args.get('gender', '男')
+    min_age = int(request.args.get('min_age', 20))
+    max_age = int(request.args.get('max_age', 35))
+    min_education = request.args.get('education')
+    top_n = int(request.args.get('top_n', 20))
+    
+    if not city:
+        return jsonify({'error': '缺少城市参数'}), 400
+    
+    from analyzer import sanitize_for_json
+    result = get_match_recommendations(
+        city=city,
+        target_gender=target_gender,
+        min_age=min_age,
+        max_age=max_age,
+        min_education=min_education if min_education else None,
+        top_n=top_n
+    )
+    return jsonify(sanitize_for_json(result))
+
 if __name__ == '__main__':
     print("🚀 启动婚恋市场数据分析看板后端服务...")
     print("📊 正在加载和分析数据...")
